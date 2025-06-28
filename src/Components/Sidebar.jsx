@@ -31,6 +31,7 @@ const Sidebar = () => {
   const [groupName, setGroupName] = useState("");
   const [unreadMessages, setUnreadMessages] = useState({});
   const userdata = JSON.parse(localStorage.getItem("User"));
+  const [loading, setLoading] = useState(true);
 
   const handleLogout = () => {
     localStorage.removeItem("Token");
@@ -55,14 +56,15 @@ const Sidebar = () => {
   };
 
   const getGroups = async () => {
+    setLoading(true);
     const response = await getGroupbyUser();
-    response?.groups?.map((group) => {
+    response.groups.map((group) => {
       socket.emit("join_room", { groupId: group._id });
     });
 
     // Get the last message for each group
     const groupsWithLastMessage = await Promise.all(
-      response?.groups?.map(async (group) => {
+      response.groups.map(async (group) => {
         try {
           const messagesResponse = await getMessages(group._id);
           const messages = messagesResponse.messages || [];
@@ -92,6 +94,7 @@ const Sidebar = () => {
     });
 
     setAllGroups(sortedGroups);
+    setLoading(false);
   };
 
   // Update socket listener for new messages
@@ -103,6 +106,7 @@ const Sidebar = () => {
             // If the chat is not currently selected, increment unread count
             if (!selectedUser || selectedUser._id !== group._id) {
               updateUnreadMessages(group._id, 1);
+              // Play notification sound
             }
             return {
               ...group,
@@ -132,7 +136,6 @@ const Sidebar = () => {
 
   const getAllUsers = async () => {
     const response = await getAllUser();
-    console.log(response.users);
     setAllUsers(response.users);
   };
   const handleMenuToggle = () => {
@@ -411,7 +414,17 @@ const Sidebar = () => {
               Group
             </button>
           </div>
-          {allgroups.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-16rem)] text-center p-8">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0078D7] to-[#00bcf2] flex items-center justify-center mb-6 animate-spin">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Loading chats...</h2>
+            </div>
+          ) : allgroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-16rem)] text-center p-8">
               <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#0078D7] to-[#00bcf2] flex items-center justify-center mb-6 shadow-lg animate-pulse">
                 <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

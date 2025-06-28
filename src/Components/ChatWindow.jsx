@@ -29,6 +29,10 @@ const ChatWindow = ({ user, closeChat }) => {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorToastMessage, setErrorToastMessage] = useState("");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,10 +57,12 @@ const ChatWindow = ({ user, closeChat }) => {
   };
   const getMesaages = async () => {
     try {
+      setLoadingMessages(true);
       const response = await getMessages(user._id);
-      console.log(response.messages);
       setMessages(response.messages);
+      setLoadingMessages(false);
     } catch {
+      setLoadingMessages(false);
       console.error("Error fetching messages");
     }
   };
@@ -143,6 +149,12 @@ const ChatWindow = ({ user, closeChat }) => {
   };
 
   const handleDeleteSelectedMessages = async () => {
+    if (selectedMessages.length === 0) {
+      setErrorToastMessage('Please select a message');
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 3000);
+      return;
+    }
     try {
       // Delete each selected message using the API
       for (const messageId of selectedMessages) {
@@ -236,7 +248,6 @@ const ChatWindow = ({ user, closeChat }) => {
                       <div className="p-1.5 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 transition-colors">
                         <RiDeleteBin6Line className="text-lg" />
                       </div>
-                      <span className="font-medium">Delete</span>
                     </button>
                   </div>
                   <button
@@ -265,10 +276,52 @@ const ChatWindow = ({ user, closeChat }) => {
               className="text-white text-2xl cursor-pointer hover:text-[#00bcf2] transition-colors"
               onClick={handleMenuToggle}
             />
+            {menuOpen && (
+              <div className="absolute right-4 top-16 bg-[#232323] border border-[#2a2a2a] rounded-lg shadow-xl min-w-[180px] z-50 animate-fadeIn">
+                <ul className="py-2">
+                  {user.isGroup && (
+                    <li
+                      className="flex items-center gap-2 px-4 py-2 text-white hover:bg-[#1a1a1a] cursor-pointer transition-colors rounded-lg"
+                      onClick={() => {
+                        setShowGroupDetails(true);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                      </svg>
+                      <span>View Group Details</span>
+                    </li>
+                  )}
+                  <li
+                    className="flex items-center gap-2 px-4 py-2 text-white hover:bg-[#1a1a1a] cursor-pointer transition-colors rounded-lg"
+                    onClick={() => {
+                      handleCloseChat();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    <span>Close Chat</span>
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {messages.length === 0 ? (
+          {loadingMessages ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0078D7] to-[#00bcf2] flex items-center justify-center mb-6 animate-spin">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Loading messages...</h2>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#0078D7] to-[#00bcf2] flex items-center justify-center mb-6 shadow-lg animate-pulse">
                 <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -277,7 +330,6 @@ const ChatWindow = ({ user, closeChat }) => {
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">No Messages Yet</h2>
               <p className="text-[#838383] text-lg mb-6">Start a conversation</p>
-           
             </div>
           ) : (
             <>
@@ -408,11 +460,50 @@ const ChatWindow = ({ user, closeChat }) => {
           <span>{notificationMessage}</span>
         </div>
       )}
+      {/* Error Toast Notification */}
+      {showErrorToast && (
+        <div className="fixed bottom-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-2 animate-fadeIn z-50 border-l-4 border-red-900">
+          <span>{errorToastMessage}</span>
+        </div>
+      )}
       <AddMemberModal
         show={showAddMemberModal}
         handleClose={handleCloseAddMemberModal}
         user={user}
       />
+      {/* Group Details Modal */}
+      {showGroupDetails && user.isGroup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 animate-fadeIn">
+          <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#2a2a2a] w-[90%] max-w-md relative">
+            <button
+              onClick={() => setShowGroupDetails(false)}
+              className="absolute top-4 right-4 text-[#838383] hover:text-white text-2xl"
+            >
+              ✕
+            </button>
+            <h2 className="text-2xl font-bold text-white mb-4">Group Details</h2>
+            <div className="mb-4">
+              <div className="text-lg font-semibold text-white mb-2">{user.groupName}</div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {user.members.map((member) => (
+                  <span key={member._id} className="bg-[#232323] text-white px-3 py-1 rounded-full text-sm">
+                    {member.fullname}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              className="w-full bg-[#0078D7] text-white py-2 rounded-lg hover:bg-[#0066b3] transition-colors mt-4"
+              onClick={() => {
+                setShowGroupDetails(false);
+                setTimeout(() => setShowAddMemberModal(true), 200); // Small delay for smooth transition
+              }}
+            >
+              Add Members
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };

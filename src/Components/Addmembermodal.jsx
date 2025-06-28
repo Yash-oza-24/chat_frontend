@@ -21,15 +21,19 @@ const AddMemberModal = ({ show, handleClose, user }) => {
 
   const getAllUsers = async () => {
     const response = await getAllUser();
-    console.log(response.users);
-    setAllUser(response.users);
+    // Exclude users already in the group
+    const groupMemberIds = user.members.map((member) => member._id);
+    const filteredUsers = response.users.filter((u) => !groupMemberIds.includes(u._id));
+    setAllUser(filteredUsers);
   };
 
   const handleSearch = (e) => {
     const searchTerm = e.target.value;
     setSearchTerm(searchTerm);
+    const groupMemberIds = user.members.map((member) => member._id);
     const searchedUsers = allUser.filter((user) =>
-      user.fullname.toLowerCase().includes(searchTerm.toLowerCase())
+      user.fullname.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !groupMemberIds.includes(user._id)
     );
     setSearchedUsers(searchedUsers);
   };
@@ -59,7 +63,12 @@ const AddMemberModal = ({ show, handleClose, user }) => {
   };
   useEffect(() => {
     getAllUsers();
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    // Show all users (filtered) by default when modal opens
+    setSearchedUsers(allUser);
+  }, [allUser]);
 
   return (
     <div
@@ -103,45 +112,54 @@ const AddMemberModal = ({ show, handleClose, user }) => {
 
         {/* Users List */}
         <div className="px-4 pb-4 overflow-y-auto max-h-[50vh]">
-          <ul className="space-y-2">
-            {searchedUsers.map((user) => (
-              <li
-                key={user._id}
-                data-id={user._id}
-                className="group flex items-center justify-between p-3 rounded-lg hover:bg-[#1a1a1a] transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ffd199] to-[#ffb366] flex justify-center items-center shadow-md">
-                    <span className="text-lg font-bold text-[#c06607]">
-                      {getFirstLetter(user.fullname)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-white block font-medium">{user.fullname}</span>
-                    <span className="text-sm text-[#838383]">@{user.username}</span>
-                  </div>
-                </div>
-                <button
-                  className="w-8 h-8 rounded-full border border-[#838383] flex items-center justify-center text-[#838383] group-hover:border-[#00bcf2] group-hover:text-[#00bcf2] transition-colors"
-                  onClick={() => {
-                    const userElement = document.querySelector(
-                      `li[data-id="${user._id}"]`
-                    );
-                    const plusIcon = userElement.querySelector("button");
-                    if (plusIcon.textContent === "+") {
-                      plusIcon.textContent = "-";
-                      userElement.classList.add("selected");
-                    } else {
-                      plusIcon.textContent = "+";
-                      userElement.classList.remove("selected");
-                    }
-                  }}
+          {searchedUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#1a1a1a] flex items-center justify-center">
+                <IoSearch className="text-2xl text-[#838383]" />
+              </div>
+              <p className="text-[#838383]">No users are here</p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {searchedUsers.map((user) => (
+                <li
+                  key={user._id}
+                  data-id={user._id}
+                  className="group flex items-center justify-between p-3 rounded-lg hover:bg-[#1a1a1a] transition-colors cursor-pointer"
                 >
-                  +
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ffd199] to-[#ffb366] flex justify-center items-center shadow-md">
+                      <span className="text-lg font-bold text-[#c06607]">
+                        {getFirstLetter(user.fullname)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-white block font-medium">{user.fullname}</span>
+                      <span className="text-sm text-[#838383]">@{user.username}</span>
+                    </div>
+                  </div>
+                  <button
+                    className="w-8 h-8 rounded-full border border-[#838383] flex items-center justify-center text-[#838383] group-hover:border-[#00bcf2] group-hover:text-[#00bcf2] transition-colors"
+                    onClick={() => {
+                      const userElement = document.querySelector(
+                        `li[data-id="${user._id}"]`
+                      );
+                      const plusIcon = userElement.querySelector("button");
+                      if (plusIcon.textContent === "+") {
+                        plusIcon.textContent = "-";
+                        userElement.classList.add("selected");
+                      } else {
+                        plusIcon.textContent = "+";
+                        userElement.classList.remove("selected");
+                      }
+                    }}
+                  >
+                    +
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Footer */}
