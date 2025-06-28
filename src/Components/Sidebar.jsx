@@ -56,13 +56,13 @@ const Sidebar = () => {
 
   const getGroups = async () => {
     const response = await getGroupbyUser();
-    response.groups.map((group) => {
+    response?.groups?.map((group) => {
       socket.emit("join_room", { groupId: group._id });
     });
 
     // Get the last message for each group
     const groupsWithLastMessage = await Promise.all(
-      response.groups.map(async (group) => {
+      response?.groups?.map(async (group) => {
         try {
           const messagesResponse = await getMessages(group._id);
           const messages = messagesResponse.messages || [];

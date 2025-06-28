@@ -1,6 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-const BASE_URL = "http://192.168.0.103:5000/api";
+const BASE_URL = "https://chat-backend-vydt.onrender.com/api";
 import { config } from "../Config/config";
 const signup = async ({ username, fullname, password }) => {
   try {
@@ -96,8 +96,8 @@ const getGroupbyUser = async () => {
     );
     console.log(response.data);
     return response.data;
-  } catch {
-    console.error("Error fetching group by user");
+  } catch (err){
+    console.error("Error fetching group by user", err);
   }
 };
 const getMessages = async (groupId) => {
