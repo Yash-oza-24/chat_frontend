@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ChatWindow from "./ChatWindow";
 import { IoSearch } from "react-icons/io5";
 import { FiEdit } from "react-icons/fi";
@@ -32,6 +32,19 @@ const Sidebar = () => {
   const [unreadMessages, setUnreadMessages] = useState({});
   const userdata = JSON.parse(localStorage.getItem("User"));
   const [loading, setLoading] = useState(true);
+
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    audioRef.current = new window.Audio('/notification.mp3');
+    // Unlock audio on first user interaction
+    const unlock = () => {
+      audioRef.current.play().then(() => audioRef.current.pause()).catch(() => {});
+      window.removeEventListener('click', unlock);
+    };
+    window.addEventListener('click', unlock);
+    return () => window.removeEventListener('click', unlock);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("Token");
@@ -99,14 +112,18 @@ const Sidebar = () => {
 
   // Update socket listener for new messages
   useEffect(() => {
-    socket.on("receive_message", (data) => {
+    const handleReceiveMessage = (data) => {
       setAllGroups((prevGroups) => {
         const updatedGroups = prevGroups.map((group) => {
           if (group._id === data.groupId) {
             // If the chat is not currently selected, increment unread count
             if (!selectedUser || selectedUser._id !== group._id) {
+              // Only play audio if not sent by current user
+              if (audioRef.current && data.username !== userdata.fullname) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(() => {});
+              }
               updateUnreadMessages(group._id, 1);
-              // Play notification sound
             }
             return {
               ...group,
@@ -127,12 +144,12 @@ const Sidebar = () => {
           return new Date(b.lastMessage.timestamp) - new Date(a.lastMessage.timestamp);
         });
       });
-    });
-
-    return () => {
-      socket.off("receive_message");
     };
-  }, [selectedUser]);
+    socket.on("receive_message", handleReceiveMessage);
+    return () => {
+      socket.off("receive_message", handleReceiveMessage);
+    };
+  }, [selectedUser, userdata.fullname]);
 
   const getAllUsers = async () => {
     const response = await getAllUser();

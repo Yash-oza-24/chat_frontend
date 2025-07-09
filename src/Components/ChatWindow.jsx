@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import { CiMenuKebab } from "react-icons/ci";
 // const socket = io("http://localhost:5000");
@@ -33,6 +33,7 @@ const ChatWindow = ({ user, closeChat }) => {
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorToastMessage, setErrorToastMessage] = useState("");
+  const audioRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,9 +68,23 @@ const ChatWindow = ({ user, closeChat }) => {
     }
   };
   useEffect(() => {
+    audioRef.current = new window.Audio('notification.mp3');
+    // Unlock audio on first user interaction
+    const unlock = () => {
+      audioRef.current.play().then(() => audioRef.current.pause()).catch(() => {});
+      window.removeEventListener('click', unlock);
+    };
+    window.addEventListener('click', unlock);
+    return () => window.removeEventListener('click', unlock);
+  }, []);
+
+  useEffect(() => {
     socket.on("receive_message", (newMessage) => {
-      console.log(newMessage);
       setMessages((prevMessages) => [...prevMessages, newMessage]);
+      if (audioRef.current && newMessage.username !== userdata.fullname) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
+      }
     });
   }, []);
 
