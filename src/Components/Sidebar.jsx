@@ -64,7 +64,7 @@ const Sidebar = () => {
 
   const getFirstLetter = (groupName) => {
     const words = groupName?.split(" ");
-    const firstLetter = words?.map((word) => word[0].toUpperCase());
+    const firstLetter = words?.map((word) => word[0]?.toUpperCase());
     return firstLetter?.join("");
   };
 
