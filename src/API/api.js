@@ -9,7 +9,6 @@ const signup = async ({ username, fullname, password }) => {
       fullname,
       password,
     });
-    console.log(response.data);
     toast.success(response.data.message);
     return response.data;
   } catch (error) {
@@ -24,7 +23,6 @@ const signin = async ({ username, password }) => {
       username,
       password,
     });
-    console.log(response.data);
     localStorage.setItem("User", JSON.stringify(response.data.user));
     localStorage.setItem("Token", response.data.token);
     toast.success(response.data.message);
@@ -38,7 +36,6 @@ const signin = async ({ username, password }) => {
 const getUserbyUsername = async ({ username }) => {
   try {
     const response = await axios.get(`${BASE_URL}/users/${username}`);
-    console.log(response.data);
     return response.data;
   } catch {
     console.error("Error fetching user by username");
@@ -64,7 +61,6 @@ const createGroup = async (user) => {
       },
       config
     );
-    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error creating user", error);
@@ -72,7 +68,6 @@ const createGroup = async (user) => {
 };
 
 const createGroups = async (groupData) => {
-  console.log(groupData);
   try {
     const response = await axios.post(
       `${BASE_URL}/group/createGroups`,
@@ -82,7 +77,6 @@ const createGroups = async (groupData) => {
       },
       config
     );
-    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error creating user", error);
@@ -94,7 +88,6 @@ const getGroupbyUser = async () => {
       `${BASE_URL}/group/getGroupsByUser`,
       config
     );
-    console.log(response.data);
     return response.data;
   } catch (err){
     console.error("Error fetching group by user", err);
@@ -105,7 +98,6 @@ const getMessages = async (groupId) => {
     const response = await axios.get(
       `${BASE_URL}/messages/getMessages/${groupId}`
     );
-    console.log(response.data);
     return response.data;
   } catch {
     console.error("Error fetching messages");
@@ -120,7 +112,6 @@ const addMember = async (groupId, members) => {
       },
       config
     );
-    console.log(response.data);
     return response.data;
   } catch {
     console.error("Error adding member to group");
@@ -129,7 +120,6 @@ const addMember = async (groupId, members) => {
 const deleteMessage = async (messageId) => {
   try {
     const response = await axios.delete(`${BASE_URL}/messages/deleteMessage/${messageId}`, config);
-    console.log(response.data);
     return response.data;
   } catch {
     console.error("Error deleting message");
@@ -151,7 +141,6 @@ const uploadFile = async (formData, groupId) => {
         return percentCompleted;
       },
     });
-    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error uploading file:", error);
