@@ -1,7 +1,7 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-// const BASE_URL = "https://chat-backend-vydt.onrender.com/api";
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://chat-backend-vydt.onrender.com/api";
+// const BASE_URL = "http://localhost:5000/api";
 
 import { config } from "../Config/config";
 const signup = async ({ username, fullname, password }) => {
