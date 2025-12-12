@@ -15,7 +15,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
 
-  // Password strength indicators
+  
   const passwordChecks = {
     length: password.length >= 8,
     hasLetter: /[a-zA-Z]/.test(password),
@@ -43,10 +43,8 @@ const Signup = () => {
     setLoading(true);
     try {
       await signup({ username, fullname, password: passwordValue });
-      toast.success("Account created successfully!");
       navigate("/signin");
     } catch (error) {
-      toast.error("Error creating account. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -56,10 +54,10 @@ const Signup = () => {
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
 
       <div className="w-full max-w-md relative z-10">
-        {/* Card */}
+        {}
         <div className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] shadow-2xl overflow-hidden">
           <div className="p-8">
-            {/* Logo & Header */}
+            {}
             <div className="flex flex-col items-center mb-8">
               <div className="w-20 h-20 bg-[#0078D7] rounded-full flex items-center justify-center mb-4 shadow-lg shadow-[#0078D7]/20">
                 <HiOutlineChat className="text-4xl text-white" />
@@ -70,9 +68,9 @@ const Signup = () => {
               </p>
             </div>
 
-            {/* Form */}
+            {}
             <form className="space-y-5" onSubmit={handleSubmit}>
-              {/* Username Field */}
+              {}
               <div className="space-y-2">
                 <label
                   htmlFor="username"
@@ -96,7 +94,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Full Name Field */}
+              {}
               <div className="space-y-2">
                 <label
                   htmlFor="fullname"
@@ -120,7 +118,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Password Field */}
+              {}
               <div className="space-y-2">
                 <label
                   htmlFor="password"
@@ -156,10 +154,10 @@ const Signup = () => {
                   </button>
                 </div>
 
-                {/* Password Strength Indicator */}
+                {}
                 {password.length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {/* Strength Bar */}
+                    {}
                     <div className="flex gap-1">
                       {[1, 2, 3].map((level) => (
                         <div
@@ -176,7 +174,7 @@ const Signup = () => {
                       ))}
                     </div>
 
-                    {/* Strength Text */}
+                    {}
                     <p
                       className={`text-xs ${passwordStrength === 1
                           ? "text-red-400"
@@ -196,7 +194,7 @@ const Signup = () => {
                             : ""}
                     </p>
 
-                    {/* Requirements */}
+                    {}
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <div
@@ -257,7 +255,7 @@ const Signup = () => {
                 )}
               </div>
 
-              {/* Submit Button */}
+              {}
               <button
                 type="submit"
                 disabled={loading}
@@ -273,7 +271,7 @@ const Signup = () => {
                 )}
               </button>
 
-              {/* Divider */}
+              {}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-[#2a2a2a]"></div>
@@ -285,7 +283,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Sign In Link */}
+              {}
               <div className="text-center">
                 <Link
                   to="/signin"
@@ -297,7 +295,7 @@ const Signup = () => {
             </form>
           </div>
 
-          {/* Footer */}
+          {}
           <div className="px-8 py-4 bg-[#0a0a0a] border-t border-[#2a2a2a]">
             <p className="text-center text-[#6a6a6a] text-xs">
               By creating an account, you agree to our{" "}

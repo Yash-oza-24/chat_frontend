@@ -1,6 +1,8 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-const BASE_URL = "https://chat-backend-vydt.onrender.com/api";
+// const BASE_URL = "https://chat-backend-vydt.onrender.com/api";
+const BASE_URL = "http://localhost:5000/api";
+
 import { config } from "../Config/config";
 const signup = async ({ username, fullname, password }) => {
   try {
@@ -89,7 +91,7 @@ const getGroupbyUser = async () => {
       config
     );
     return response.data;
-  } catch (err){
+  } catch (err) {
     console.error("Error fetching group by user", err);
   }
 };
@@ -148,6 +150,16 @@ const uploadFile = async (formData, groupId) => {
   }
 };
 
+const deleteGroup = async (groupId) => {
+  try {
+    const response = await axios.delete(`${BASE_URL}/group/deleteGroup/${groupId}`, config);
+    return response.data;
+  }
+  catch {
+    console.error("Error deleting group");
+  }
+}
+
 export {
   signup,
   signin,
@@ -160,4 +172,5 @@ export {
   addMember,
   deleteMessage,
   uploadFile,
+  deleteGroup
 };

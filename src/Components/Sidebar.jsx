@@ -3,6 +3,7 @@ import ChatWindow from "./ChatWindow";
 import { IoSearch, IoClose, IoLogOutOutline } from "react-icons/io5";
 import { FiEdit, FiUsers, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { CiMenuKebab } from "react-icons/ci";
+import { HiOutlineUserGroup } from "react-icons/hi";
 import { useNavigate } from "react-router-dom";
 import {
   createGroup,
@@ -31,6 +32,11 @@ const Sidebar = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
   const [groupName, setGroupName] = useState("");
+  const [creatingChatWith, setCreatingChatWith] = useState(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   // Resizable sidebar state
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -44,16 +50,20 @@ const Sidebar = () => {
   const userdata = JSON.parse(localStorage.getItem("User"));
   const menuRef = useRef(null);
   const userMenuRef = useRef(null);
+  // Show toast notification
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+  };
 
   // Get users that already have a chat (to filter from new chat modal)
   const getExistingChatUserIds = useCallback(() => {
     const existingUserIds = new Set();
 
     allGroups.forEach((group) => {
-      // For non-group chats, get the other user's ID
       if (!group.isGroup) {
-        group.members.forEach((member) => {
-          if (member._id !== userdata._id) {
+        group.members?.forEach((member) => {
+          if (member._id !== userdata?._id) {
             existingUserIds.add(member._id);
           }
         });
@@ -61,15 +71,15 @@ const Sidebar = () => {
     });
 
     return existingUserIds;
-  }, [allGroups, userdata._id]);
+  }, [allGroups, userdata?._id]);
 
   // Filter users for new chat modal (exclude existing chats)
   const getAvailableUsersForNewChat = useCallback(() => {
     const existingUserIds = getExistingChatUserIds();
     return allUser.filter(
-      (user) => user._id !== userdata._id && !existingUserIds.has(user._id)
+      (user) => user._id !== userdata?._id && !existingUserIds.has(user._id)
     );
-  }, [allUser, userdata._id, getExistingChatUserIds]);
+  }, [allUser, userdata?._id, getExistingChatUserIds]);
 
   // Resizable sidebar handlers
   const startResizing = useCallback((e) => {
@@ -86,7 +96,6 @@ const Sidebar = () => {
       if (isResizing && sidebarRef.current) {
         const newWidth = e.clientX - sidebarRef.current.getBoundingClientRect().left;
 
-        // Collapse if dragged too small
         if (newWidth < minWidth - 50) {
           setIsCollapsed(true);
           setSidebarWidth(collapsedWidth);
@@ -99,7 +108,6 @@ const Sidebar = () => {
     [isResizing]
   );
 
-  // Toggle collapse on double click
   const handleDoubleClick = useCallback(() => {
     if (isCollapsed) {
       setIsCollapsed(false);
@@ -174,6 +182,12 @@ const Sidebar = () => {
     setLoading(true);
     try {
       const response = await getGroupbyUser();
+
+      if (!response?.groups) {
+        setLoading(false);
+        return;
+      }
+
       response.groups.forEach((group) => {
         socket.emit("join_room", { groupId: group._id });
       });
@@ -182,7 +196,7 @@ const Sidebar = () => {
         response.groups.map(async (group) => {
           try {
             const messagesResponse = await getMessages(group._id);
-            const messages = messagesResponse.messages || [];
+            const messages = messagesResponse?.messages || [];
             const lastMessage =
               messages.length > 0 ? messages[messages.length - 1] : null;
             return {
@@ -191,8 +205,8 @@ const Sidebar = () => {
                 ? {
                   message: lastMessage.message,
                   sender:
-                    lastMessage.username === userdata.fullname
-                      ? userdata._id
+                    lastMessage.username === userdata?.fullname
+                      ? userdata?._id
                       : lastMessage.sender,
                   timestamp: lastMessage.createdAt,
                 }
@@ -224,20 +238,19 @@ const Sidebar = () => {
   const getAllUsers = async () => {
     try {
       const response = await getAllUser();
-      setAllUsers(response.users);
+      setAllUsers(response?.users || []);
     } catch (error) {
       console.error("Error fetching users:", error);
     }
   };
 
-  // Socket listener for new messages
   useEffect(() => {
     const handleReceiveMessage = (data) => {
       setAllGroups((prevGroups) => {
         const updatedGroups = prevGroups.map((group) => {
           if (group._id === data.groupId) {
             if (!selectedUser || selectedUser._id !== group._id) {
-              if (data.username !== userdata.fullname) {
+              if (data.username !== userdata?.fullname) {
                 notification.play();
               }
               setUnreadMessages((prev) => ({
@@ -270,14 +283,18 @@ const Sidebar = () => {
 
     socket.on("receive_message", handleReceiveMessage);
     return () => socket.off("receive_message", handleReceiveMessage);
-  }, [selectedUser, userdata.fullname]);
+  }, [selectedUser, userdata?.fullname]);
 
   useEffect(() => {
-    const token = localStorage.getItem("Token");
-    if (token) {
-      getGroups();
-      getAllUsers();
-    }
+    const initializeData = async () => {
+      const token = localStorage.getItem("Token");
+      if (token && userdata) {
+        await getGroups();
+        await getAllUsers();
+      }
+    };
+
+    initializeData();
   }, []);
 
   const closeChat = () => setSelectedUser(null);
@@ -286,10 +303,9 @@ const Sidebar = () => {
     const term = e.target.value;
     setSearchTerm(term);
 
-    // Get available users (excluding existing chats for new chat modal)
     const availableUsers = showNewChatModal
       ? getAvailableUsersForNewChat()
-      : allUser.filter((user) => user._id !== userdata._id);
+      : allUser.filter((user) => user._id !== userdata?._id);
 
     const filtered = availableUsers.filter((user) =>
       user.fullname?.toLowerCase().includes(term?.toLowerCase())
@@ -303,24 +319,25 @@ const Sidebar = () => {
   };
 
   const initializeNewChatUsers = () => {
-    // Filter out users who already have a chat
     const availableUsers = getAvailableUsersForNewChat();
     setSearchedUsers(availableUsers);
     setSearchTerm("");
   };
 
   const initializeGroupUsers = () => {
-    // For groups, show all users except current user
-    const filtered = allUser.filter((user) => user._id !== userdata._id);
+    const filtered = allUser.filter((user) => user._id !== userdata?._id);
     setSearchedUsers(filtered);
     setSearchTerm("");
   };
 
   const handleNewChatUserClick = async (user) => {
+    if (creatingChatWith) return;
+
+    setCreatingChatWith(user._id);
+
     try {
       const response = await createGroup(user);
-      // Extract the group from response - adjust based on your API structure
-      const newGroup = response.newGroup || response.newGroup || response;
+      const newGroup = response?.newGroup || response?.group || response;
 
       if (!newGroup || !newGroup._id) {
         console.error("Invalid group response:", response);
@@ -328,8 +345,6 @@ const Sidebar = () => {
       }
 
       newGroup.lastMessage = null;
-
-      // Join socket room for the new group
       socket.emit("join_room", { groupId: newGroup._id });
 
       setAllGroups((prev) => [...prev, newGroup]);
@@ -339,14 +354,17 @@ const Sidebar = () => {
       setMenuOpen(false);
     } catch (error) {
       console.error("Error creating chat:", error);
+    } finally {
+      setCreatingChatWith(null);
     }
   };
 
   const handleNewGroupClick = async () => {
-    if (!groupName.trim() || selectedGroupMembers.length === 0) return;
+    if (!groupName.trim() || selectedGroupMembers.length === 0 || creatingGroup) return;
 
+    setCreatingGroup(true);
     try {
-      const newGroup = await createGroups({
+      await createGroups({
         groupName: groupName.trim(),
         members: selectedGroupMembers,
       });
@@ -354,9 +372,13 @@ const Sidebar = () => {
       setGroupName("");
       setSelectedGroupMembers([]);
       setSearchTerm("");
-      getGroups();
+      await getGroups();
+      showToast("Group created successfully!");
     } catch (error) {
       console.error("Error creating group:", error);
+      showToast("Failed to create group", "error");
+    } finally {
+      setCreatingGroup(false);
     }
   };
 
@@ -369,21 +391,23 @@ const Sidebar = () => {
   };
 
   const getChatDisplayName = (group) => {
-    if (userdata.fullname === group.groupName) {
-      return group.members
-        .filter((m) => m._id !== userdata._id)
+    if (!group?.groupName) return "Unknown";
+    if (userdata?.fullname === group.groupName) {
+      return (group.members || [])
+        .filter((m) => m._id !== userdata?._id)
         .map((m) => m.fullname)
-        .join(", ");
+        .join(", ") || "Unknown";
     }
     return group.groupName;
   };
 
   const getChatInitials = (group) => {
-    if (userdata.fullname === group.groupName) {
-      return group.members
-        .filter((m) => m._id !== userdata._id)
+    if (!group?.groupName) return "?";
+    if (userdata?.fullname === group.groupName) {
+      return (group.members || [])
+        .filter((m) => m._id !== userdata?._id)
         .map((m) => getFirstLetter(m.fullname))
-        .join("");
+        .join("") || "?";
     }
     return getFirstLetter(group.groupName);
   };
@@ -399,7 +423,13 @@ const Sidebar = () => {
     return matchesSearch && matchesTab;
   });
 
-  const userAvatarColor = getAvatarColor(userdata.fullname);
+  const userAvatarColor = getAvatarColor(userdata?.fullname);
+
+  // Check if user data exists
+  if (!userdata) {
+    navigate("/signin");
+    return null;
+  }
 
   return (
     <div className="flex flex-col md:flex-row bg-[#0a0a0a] h-screen overflow-hidden">
@@ -728,7 +758,6 @@ const Sidebar = () => {
           onMouseDown={startResizing}
           onDoubleClick={handleDoubleClick}
         >
-          {/* Visual indicator on hover */}
           <div className="absolute top-1/2 right-0 transform -translate-y-1/2 w-1 h-16 bg-[#2a2a2a] group-hover:bg-[#0078D7] rounded-full transition-colors"></div>
         </div>
 
@@ -761,7 +790,18 @@ const Sidebar = () => {
       {/* Chat Window */}
       <div className={`${selectedUser ? "flex" : "hidden md:flex"} flex-1`}>
         {selectedUser ? (
-          <ChatWindow user={selectedUser} closeChat={closeChat} />
+          <ChatWindow
+            user={selectedUser}
+            closeChat={closeChat}
+            onGroupDeleted={(groupId) => {
+              setAllGroups((prev) => prev.filter((g) => g._id !== groupId));
+              setUnreadMessages((prev) => {
+                const updated = { ...prev };
+                delete updated[groupId];
+                return updated;
+              });
+            }}
+          />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-[#0a0a0a] p-8 text-center">
             <div className="w-24 h-24 rounded-full bg-[#0078D7] flex items-center justify-center mb-6">
@@ -812,10 +852,13 @@ const Sidebar = () => {
               </div>
               <button
                 onClick={() => {
-                  setShowNewChatModal(false);
-                  setSearchTerm("");
+                  if (!creatingChatWith) {
+                    setShowNewChatModal(false);
+                    setSearchTerm("");
+                  }
                 }}
-                className="w-8 h-8 rounded-full hover:bg-[#2a2a2a] flex items-center justify-center text-[#8a8a8a] hover:text-white"
+                disabled={creatingChatWith}
+                className="w-8 h-8 rounded-full hover:bg-[#2a2a2a] flex items-center justify-center text-[#8a8a8a] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <IoClose size={20} />
               </button>
@@ -828,7 +871,8 @@ const Sidebar = () => {
                   value={searchTerm}
                   onChange={handleSearch}
                   placeholder="Search users..."
-                  className="w-full bg-[#0a0a0a] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a]"
+                  disabled={creatingChatWith}
+                  className="w-full bg-[#0a0a0a] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -847,35 +891,51 @@ const Sidebar = () => {
                 <ul className="space-y-1">
                   {searchedUsers.map((user) => {
                     const avatarColor = getAvatarColor(user.fullname);
+                    const isCreating = creatingChatWith === user._id;
+                    const isDisabled = creatingChatWith && !isCreating;
+
                     return (
                       <li
                         key={user._id}
-                        onClick={() => handleNewChatUserClick(user)}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#2a2a2a] cursor-pointer transition-colors"
+                        onClick={() => !isDisabled && handleNewChatUserClick(user)}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${isCreating
+                          ? "bg-[#0078D7]/20 border border-[#0078D7]/50"
+                          : isDisabled
+                            ? "opacity-50 cursor-not-allowed"
+                            : "hover:bg-[#2a2a2a] cursor-pointer border border-transparent"
+                          }`}
                       >
                         <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: avatarColor.bg }}
+                          className="w-10 h-10 rounded-full flex items-center justify-center relative"
+                          style={{ backgroundColor: isCreating ? '#1a1a1a' : avatarColor.bg }}
                         >
-                          <span
-                            className="text-sm font-semibold"
-                            style={{ color: avatarColor.text }}
-                          >
-                            {getFirstLetter(user.fullname)}
-                          </span>
+                          {isCreating ? (
+                            <div className="w-5 h-5 border-2 border-[#0078D7] border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <span
+                              className="text-sm font-semibold"
+                              style={{ color: avatarColor.text }}
+                            >
+                              {getFirstLetter(user.fullname)}
+                            </span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-white block truncate">
                             {user.fullname}
                           </span>
                           <span className="text-[#6a6a6a] text-xs">
-                            @{user.username}
+                            {isCreating ? "Creating chat..." : `@${user.username}`}
                           </span>
                         </div>
-                        <FiMessageCircle
-                          size={18}
-                          className="text-[#0078D7] flex-shrink-0"
-                        />
+                        {isCreating ? (
+                          <div className="w-5 h-5 border-2 border-[#0078D7] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                        ) : (
+                          <FiMessageCircle
+                            size={18}
+                            className="text-[#0078D7] flex-shrink-0"
+                          />
+                        )}
                       </li>
                     );
                   })}
@@ -904,12 +964,15 @@ const Sidebar = () => {
               </div>
               <button
                 onClick={() => {
-                  setShowNewGroupModal(false);
-                  setGroupName("");
-                  setSelectedGroupMembers([]);
-                  setSearchTerm("");
+                  if (!creatingGroup) {
+                    setShowNewGroupModal(false);
+                    setGroupName("");
+                    setSelectedGroupMembers([]);
+                    setSearchTerm("");
+                  }
                 }}
-                className="w-8 h-8 rounded-full hover:bg-[#2a2a2a] flex items-center justify-center text-[#8a8a8a] hover:text-white"
+                disabled={creatingGroup}
+                className="w-8 h-8 rounded-full hover:bg-[#2a2a2a] flex items-center justify-center text-[#8a8a8a] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <IoClose size={20} />
               </button>
@@ -920,7 +983,8 @@ const Sidebar = () => {
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Group Name"
-                className="w-full bg-[#0a0a0a] rounded-lg py-2.5 px-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a]"
+                disabled={creatingGroup}
+                className="w-full bg-[#0a0a0a] rounded-lg py-2.5 px-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a] disabled:opacity-50"
               />
               <div className="relative">
                 <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6a6a6a]" />
@@ -929,7 +993,8 @@ const Sidebar = () => {
                   value={searchTerm}
                   onChange={handleSearch}
                   placeholder="Search users..."
-                  className="w-full bg-[#0a0a0a] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a]"
+                  disabled={creatingGroup}
+                  className="w-full bg-[#0a0a0a] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#0078D7] border border-[#2a2a2a] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -947,10 +1012,11 @@ const Sidebar = () => {
                     return (
                       <li
                         key={user._id}
-                        onClick={() => toggleGroupMember(user._id)}
-                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${isSelected
-                          ? "bg-[#0078D7]/20 border border-[#0078D7]/50"
-                          : "hover:bg-[#2a2a2a] border border-transparent"
+                        onClick={() => !creatingGroup && toggleGroupMember(user._id)}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${creatingGroup ? "opacity-50 cursor-not-allowed" : ""
+                          } ${isSelected
+                            ? "bg-[#0078D7]/20 border border-[#0078D7]/50"
+                            : "hover:bg-[#2a2a2a] border border-transparent"
                           }`}
                       >
                         <div className="flex items-center gap-3">
@@ -999,17 +1065,43 @@ const Sidebar = () => {
               <button
                 onClick={handleNewGroupClick}
                 disabled={
-                  !groupName.trim() || selectedGroupMembers.length === 0
+                  !groupName.trim() || selectedGroupMembers.length === 0 || creatingGroup
                 }
-                className={`w-full py-2.5 rounded-lg font-medium transition-colors ${groupName.trim() && selectedGroupMembers.length > 0
+                className={`w-full py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${groupName.trim() && selectedGroupMembers.length > 0 && !creatingGroup
                   ? "bg-[#0078D7] text-white hover:bg-[#006abc]"
                   : "bg-[#2a2a2a] text-[#6a6a6a] cursor-not-allowed"
                   }`}
               >
-                Create Group
+                {creatingGroup ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Creating Group...</span>
+                  </>
+                ) : (
+                  "Create Group"
+                )}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 z-50 animate-slideUp ${toast.type === "success"
+            ? "bg-[#1a1a1a] border border-[#2a2a2a]"
+            : "bg-red-500/90"
+            }`}
+        >
+          {toast.type === "success" ? (
+            <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <IoClose className="text-white" size={20} />
+          )}
+          <span className="text-white text-sm">{toast.message}</span>
         </div>
       )}
 
@@ -1023,8 +1115,34 @@ const Sidebar = () => {
             opacity: 1;
           }
         }
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translate(-50%, 20px);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+        }
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out;
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.2s ease-out;
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
         }
         
         /* Custom scrollbar */

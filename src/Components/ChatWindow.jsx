@@ -3,18 +3,16 @@ import { CiMenuKebab } from "react-icons/ci";
 import {
   IoArrowBack,
   IoClose,
-  IoCheckmarkDone,
-  IoCheckmark,
   IoTrashOutline,
 } from "react-icons/io5";
 import { LuSendHorizontal } from "react-icons/lu";
-import { FiUsers, FiX, FiCheck, FiExternalLink } from "react-icons/fi";
+import { FiUsers, FiCheck } from "react-icons/fi";
 import { HiOutlineUserAdd } from "react-icons/hi";
 import { RiCheckboxCircleLine, RiCheckboxCircleFill } from "react-icons/ri";
 import { BsEmojiSmile } from "react-icons/bs";
 import socket from "../Config/socket";
 import notification from "../Config/notification";
-import { getMessages, deleteMessage } from "../API/api";
+import { getMessages, deleteMessage, deleteGroup } from "../API/api";
 import AddMemberModal from "./Addmembermodal";
 
 // Emoji Data organized by categories
@@ -171,7 +169,6 @@ const EmojiPicker = ({ onSelect, onClose }) => {
       ref={pickerRef}
       className="absolute bottom-full left-0 mb-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl w-[320px] md:w-[350px] overflow-hidden animate-scaleIn z-50"
     >
-      {/* Search Bar */}
       <div className="p-3 border-b border-[#2a2a2a]">
         <input
           type="text"
@@ -182,15 +179,14 @@ const EmojiPicker = ({ onSelect, onClose }) => {
         />
       </div>
 
-      {/* Category Tabs */}
       {!searchQuery && (
         <div className="flex items-center gap-1 px-2 py-2 border-b border-[#2a2a2a] overflow-x-auto scrollbar-hide">
           {recentEmojis.length > 0 && (
             <button
               onClick={() => setActiveCategory("Recent")}
               className={`p-2 rounded-lg text-lg flex-shrink-0 transition-colors ${activeCategory === "Recent"
-                ? "bg-[#0078D7]"
-                : "hover:bg-[#2a2a2a]"
+                  ? "bg-[#0078D7]"
+                  : "hover:bg-[#2a2a2a]"
                 }`}
               title="Recent"
             >
@@ -202,8 +198,8 @@ const EmojiPicker = ({ onSelect, onClose }) => {
               key={category}
               onClick={() => setActiveCategory(category)}
               className={`p-2 rounded-lg text-lg flex-shrink-0 transition-colors ${activeCategory === category
-                ? "bg-[#0078D7]"
-                : "hover:bg-[#2a2a2a]"
+                  ? "bg-[#0078D7]"
+                  : "hover:bg-[#2a2a2a]"
                 }`}
               title={category}
             >
@@ -213,7 +209,6 @@ const EmojiPicker = ({ onSelect, onClose }) => {
         </div>
       )}
 
-      {/* Emoji Grid */}
       <div className="h-[250px] overflow-y-auto p-2">
         {searchQuery ? (
           <div className="grid grid-cols-8 gap-1">
@@ -278,15 +273,13 @@ const EmojiPicker = ({ onSelect, onClose }) => {
   );
 };
 
-// Message Parser Component - Handles links, phone numbers, emails (Clean version without icons)
+// Message Parser Component
 const ParsedMessage = ({ text, isOwn }) => {
   const parseMessage = (message) => {
-    // Regular expressions for different patterns
     const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
     const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
     const phonePattern = /(\+?[\d][\d\s\-().]{7,}[\d])/g;
 
-    // Combine all patterns
     const combinedPattern = new RegExp(
       `(${urlPattern.source})|(${emailPattern.source})|(${phonePattern.source})`,
       "gi"
@@ -362,7 +355,6 @@ const ParsedMessage = ({ text, isOwn }) => {
           return <span key={index}>{part.content}</span>;
         }
 
-        // Clean link styling without icons
         return (
           <a
             key={index}
@@ -370,8 +362,8 @@ const ParsedMessage = ({ text, isOwn }) => {
             target={part.type === "url" ? "_blank" : undefined}
             rel={part.type === "url" ? "noopener noreferrer" : undefined}
             className={`${isOwn
-              ? "text-white underline decoration-white/60 hover:decoration-white decoration-1 underline-offset-2"
-              : "text-[#3b9eff] hover:text-[#5aadff] underline decoration-[#3b9eff]/50 hover:decoration-[#3b9eff] decoration-1 underline-offset-2"
+                ? "text-white underline decoration-white/60 hover:decoration-white decoration-1 underline-offset-2"
+                : "text-[#3b9eff] hover:text-[#5aadff] underline decoration-[#3b9eff]/50 hover:decoration-[#3b9eff] decoration-1 underline-offset-2"
               } break-all transition-colors`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -383,7 +375,7 @@ const ParsedMessage = ({ text, isOwn }) => {
   );
 };
 
-const ChatWindow = ({ user, closeChat }) => {
+const ChatWindow = ({ user, closeChat, onGroupDeleted }) => {
   const userdata = JSON.parse(localStorage.getItem("User"));
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -399,6 +391,10 @@ const ChatWindow = ({ user, closeChat }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Delete group/chat states
+  const [showDeleteGroupConfirm, setShowDeleteGroupConfirm] = useState(false);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -438,6 +434,38 @@ const ChatWindow = ({ user, closeChat }) => {
     return colors[index];
   };
 
+  // Check if user can delete the group/chat
+  const canDeleteGroup = () => {
+    if (!user) return false;
+    if (!user.isGroup) return true;
+    return user.isAdmin === userdata?._id || user.isAdmin?._id === userdata?._id;
+  };
+
+  // Handle delete group/chat
+  const handleDeleteGroup = async () => {
+    if (!user || isDeletingGroup) return;
+
+    setIsDeletingGroup(true);
+    try {
+      await deleteGroup(user._id);
+      showToast(
+        user.isGroup ? "Group deleted successfully" : "Chat deleted successfully"
+      );
+      setShowDeleteGroupConfirm(false);
+
+      if (onGroupDeleted) {
+        onGroupDeleted(user._id);
+      }
+
+      closeChat();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      showToast("Failed to delete. Please try again.", "error");
+    } finally {
+      setIsDeletingGroup(false);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -450,7 +478,7 @@ const ChatWindow = ({ user, closeChat }) => {
     if (inputRef.current && !isSelectionMode) {
       inputRef.current.focus();
     }
-  }, [user._id, isSelectionMode]);
+  }, [user?._id, isSelectionMode]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -469,6 +497,8 @@ const ChatWindow = ({ user, closeChat }) => {
           setShowEmojiPicker(false);
         } else if (showDeleteConfirm) {
           setShowDeleteConfirm(false);
+        } else if (showDeleteGroupConfirm) {
+          setShowDeleteGroupConfirm(false);
         } else if (isSelectionMode) {
           exitSelectionMode();
         }
@@ -476,12 +506,11 @@ const ChatWindow = ({ user, closeChat }) => {
     };
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [isSelectionMode, showDeleteConfirm, showEmojiPicker]);
+  }, [isSelectionMode, showDeleteConfirm, showEmojiPicker, showDeleteGroupConfirm]);
 
   const getMessages_ = async () => {
     if (!user?._id) {
       setLoadingMessages(false);
-      console.error("No user ID provided");
       return;
     }
 
@@ -497,23 +526,20 @@ const ChatWindow = ({ user, closeChat }) => {
     }
   };
 
-  // Mark messages as read when viewing
   useEffect(() => {
-    if (messages.length > 0 && user._id) {
-      // Emit read status to server
+    if (messages.length > 0 && user?._id) {
       socket.emit("messages_read", {
         groupId: user._id,
         readBy: userdata._id,
       });
     }
-  }, [messages, user._id]);
+  }, [messages, user?._id]);
 
   useEffect(() => {
     const handleReceiveMessage = (newMessage) => {
       setMessages((prevMessages) => [...prevMessages, newMessage]);
       if (newMessage.username !== userdata.fullname) {
         notification.play();
-        // Mark as read immediately if chat is open
         socket.emit("messages_read", {
           groupId: user._id,
           readBy: userdata._id,
@@ -522,8 +548,7 @@ const ChatWindow = ({ user, closeChat }) => {
     };
 
     const handleMessagesRead = (data) => {
-      // Update messages read status
-      if (data.groupId === user._id) {
+      if (data.groupId === user?._id) {
         setMessages((prevMessages) =>
           prevMessages.map((msg) => ({
             ...msg,
@@ -542,12 +567,13 @@ const ChatWindow = ({ user, closeChat }) => {
       socket.off("receive_message", handleReceiveMessage);
       socket.off("messages_read", handleMessagesRead);
     };
-  }, [user._id, userdata.fullname]);
+  }, [user?._id, userdata?.fullname]);
 
   useEffect(() => {
     setMessages([]);
     exitSelectionMode();
     setShowEmojiPicker(false);
+    setShowDeleteGroupConfirm(false);
     if (user?._id) {
       getMessages_();
     } else {
@@ -662,22 +688,26 @@ const ChatWindow = ({ user, closeChat }) => {
 
   const getChatDisplayName = () => {
     if (!user || !user.groupName) return "Unknown";
-    if (userdata.fullname === user.groupName) {
-      return (user.members || [])
-        .filter((m) => m._id !== userdata._id)
-        .map((m) => m.fullname)
-        .join(", ") || "Unknown";
+    if (userdata?.fullname === user.groupName) {
+      return (
+        (user.members || [])
+          .filter((m) => m._id !== userdata?._id)
+          .map((m) => m.fullname)
+          .join(", ") || "Unknown"
+      );
     }
     return user.groupName;
   };
 
   const getChatInitials = () => {
     if (!user || !user.groupName) return "?";
-    if (userdata.fullname === user.groupName) {
-      return (user.members || [])
-        .filter((m) => m._id !== userdata._id)
-        .map((m) => getFirstLetter(m.fullname))
-        .join("") || "?";
+    if (userdata?.fullname === user.groupName) {
+      return (
+        (user.members || [])
+          .filter((m) => m._id !== userdata?._id)
+          .map((m) => getFirstLetter(m.fullname))
+          .join("") || "?"
+      );
     }
     return getFirstLetter(user.groupName);
   };
@@ -692,8 +722,8 @@ const ChatWindow = ({ user, closeChat }) => {
   }, {});
 
   const shouldShowSenderName = (msgs, index, currentMsg) => {
-    if (!user.isGroup) return false;
-    if (currentMsg.username === userdata.fullname) return false;
+    if (!user?.isGroup) return false;
+    if (currentMsg.username === userdata?.fullname) return false;
     if (index === 0) return true;
     return msgs[index - 1].username !== currentMsg.username;
   };
@@ -730,9 +760,9 @@ const ChatWindow = ({ user, closeChat }) => {
               <h3 className="text-white font-semibold text-sm md:text-base truncate max-w-[150px] md:max-w-[250px]">
                 {getChatDisplayName()}
               </h3>
-              {user.isGroup && (
+              {user?.isGroup && (
                 <p className="text-[#8a8a8a] text-xs">
-                  {user.members.length} members
+                  {user.members?.length || 0} members
                 </p>
               )}
             </div>
@@ -748,7 +778,7 @@ const ChatWindow = ({ user, closeChat }) => {
 
             {menuOpen && (
               <div className="absolute right-0 top-full mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl min-w-[180px] z-50 py-1 animate-fadeIn">
-                {user.isGroup && (
+                {user?.isGroup && (
                   <button
                     onClick={() => {
                       setShowGroupDetails(true);
@@ -770,6 +800,32 @@ const ChatWindow = ({ user, closeChat }) => {
                   <FiCheck size={16} className="text-[#0078D7]" />
                   <span className="text-sm">Select Messages</span>
                 </button>
+
+                {/* Delete Group/Chat Button */}
+                {canDeleteGroup() && (
+                  <button
+                    onClick={() => {
+                      setShowDeleteGroupConfirm(true);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:bg-[#2a2a2a] transition-colors text-left"
+                  >
+                    <IoTrashOutline size={16} />
+                    <span className="text-sm">
+                      {user?.isGroup ? "Delete Group" : "Delete Chat"}
+                    </span>
+                  </button>
+                )}
+
+                {/* Show message if user can't delete group */}
+                {!canDeleteGroup() && user?.isGroup && (
+                  <div className="px-4 py-2.5 text-[#6a6a6a] text-sm">
+                    Only admin can delete group
+                  </div>
+                )}
+
+                <div className="h-px bg-[#2a2a2a] my-1"></div>
+
                 <button
                   onClick={() => {
                     closeChat();
@@ -777,7 +833,7 @@ const ChatWindow = ({ user, closeChat }) => {
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-white hover:bg-[#2a2a2a] transition-colors text-left"
                 >
-                  <IoClose size={16} className="text-red-400" />
+                  <IoClose size={16} className="text-[#8a8a8a]" />
                   <span className="text-sm">Close Chat</span>
                 </button>
               </div>
@@ -820,8 +876,8 @@ const ChatWindow = ({ user, closeChat }) => {
               }}
               disabled={selectedMessages.length === 0}
               className={`p-2 rounded-lg transition-colors ${selectedMessages.length > 0
-                ? "text-red-400 hover:bg-red-500/20"
-                : "text-[#4a4a4a] cursor-not-allowed"
+                  ? "text-red-400 hover:bg-red-500/20"
+                  : "text-[#4a4a4a] cursor-not-allowed"
                 }`}
             >
               <IoTrashOutline size={20} />
@@ -859,7 +915,7 @@ const ChatWindow = ({ user, closeChat }) => {
                   </div>
 
                   {msgs.map((msg, index) => {
-                    const isOwn = msg.username === userdata.fullname;
+                    const isOwn = msg.username === userdata?.fullname;
                     const isSelected = selectedMessages.includes(msg._id);
                     const senderColor = getAvatarColor(msg.username);
                     const usernameColor = getUsernameColor(msg.username);
@@ -875,7 +931,6 @@ const ChatWindow = ({ user, closeChat }) => {
                           className={`flex items-center gap-2 max-w-[85%] md:max-w-[70%] ${isOwn ? "flex-row-reverse" : "flex-row"
                             }`}
                         >
-                          {/* Selection Checkbox */}
                           {isSelectionMode && (
                             <button
                               onClick={() => handleMessageSelect(msg._id)}
@@ -895,8 +950,7 @@ const ChatWindow = ({ user, closeChat }) => {
                             </button>
                           )}
 
-                          {/* Avatar for group chats */}
-                          {user.isGroup && !isOwn && !isSelectionMode && (
+                          {user?.isGroup && !isOwn && !isSelectionMode && (
                             <div
                               className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${showName ? "visible" : "invisible"
                                 }`}
@@ -911,7 +965,6 @@ const ChatWindow = ({ user, closeChat }) => {
                             </div>
                           )}
 
-                          {/* Message Bubble */}
                           <div
                             onClick={() => handleMessageSelect(msg._id)}
                             onContextMenu={(e) => {
@@ -919,8 +972,8 @@ const ChatWindow = ({ user, closeChat }) => {
                               handleMessageLongPress(msg._id);
                             }}
                             className={`relative cursor-pointer transition-all duration-150 ${isOwn
-                              ? "bg-[#0078D7] text-white rounded-2xl rounded-br-sm"
-                              : "bg-[#1a1a1a] text-white rounded-2xl rounded-bl-sm"
+                                ? "bg-[#0078D7] text-white rounded-2xl rounded-br-sm"
+                                : "bg-[#1a1a1a] text-white rounded-2xl rounded-bl-sm"
                               } ${isSelected && isSelectionMode
                                 ? "ring-2 ring-[#0078D7] bg-opacity-80"
                                 : ""
@@ -945,9 +998,7 @@ const ChatWindow = ({ user, closeChat }) => {
                                 </p>
                                 <div className="flex items-center gap-0.5 flex-shrink-0 pb-0.5">
                                   <span
-                                    className={`text-[10px] ${isOwn
-                                      ? "text-white/60"
-                                      : "text-[#6a6a6a]"
+                                    className={`text-[10px] ${isOwn ? "text-white/60" : "text-[#6a6a6a]"
                                       }`}
                                   >
                                     {formattedTime(msg.createdAt)}
@@ -967,10 +1018,9 @@ const ChatWindow = ({ user, closeChat }) => {
           )}
         </div>
 
-        {/* Input Area - Hidden in Selection Mode */}
+        {/* Input Area */}
         {!isSelectionMode && (
           <div className="p-3 md:p-4 border-t border-[#1a1a1a] bg-[#0a0a0a] relative">
-            {/* Emoji Picker */}
             {showEmojiPicker && (
               <EmojiPicker
                 onSelect={handleEmojiSelect}
@@ -979,12 +1029,11 @@ const ChatWindow = ({ user, closeChat }) => {
             )}
 
             <div className="flex items-center gap-2 md:gap-3">
-              {/* Emoji Button */}
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className={`p-2 rounded-full transition-colors ${showEmojiPicker
-                  ? "bg-[#0078D7] text-white"
-                  : "text-[#6a6a6a] hover:text-white hover:bg-[#1a1a1a]"
+                    ? "bg-[#0078D7] text-white"
+                    : "text-[#6a6a6a] hover:text-white hover:bg-[#1a1a1a]"
                   }`}
               >
                 <BsEmojiSmile size={22} />
@@ -1004,8 +1053,8 @@ const ChatWindow = ({ user, closeChat }) => {
                 onClick={handleSendMessage}
                 disabled={!message.trim()}
                 className={`w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-colors ${message.trim()
-                  ? "bg-[#0078D7] text-white hover:bg-[#006abc]"
-                  : "bg-[#1a1a1a] text-[#6a6a6a] cursor-not-allowed"
+                    ? "bg-[#0078D7] text-white hover:bg-[#006abc]"
+                    : "bg-[#1a1a1a] text-[#6a6a6a] cursor-not-allowed"
                   }`}
               >
                 <LuSendHorizontal size={18} />
@@ -1030,8 +1079,8 @@ const ChatWindow = ({ user, closeChat }) => {
                 }}
                 disabled={selectedMessages.length === 0}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${selectedMessages.length > 0
-                  ? "bg-red-500 text-white hover:bg-red-600"
-                  : "bg-[#2a2a2a] text-[#4a4a4a] cursor-not-allowed"
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-[#2a2a2a] text-[#4a4a4a] cursor-not-allowed"
                   }`}
               >
                 <IoTrashOutline size={18} />
@@ -1042,7 +1091,7 @@ const ChatWindow = ({ user, closeChat }) => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Messages Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-[#1a1a1a] rounded-xl w-full max-w-sm border border-[#2a2a2a] overflow-hidden animate-scaleIn">
@@ -1092,12 +1141,70 @@ const ChatWindow = ({ user, closeChat }) => {
         </div>
       )}
 
+      {/* Delete Group/Chat Confirmation Modal */}
+      {showDeleteGroupConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-[#1a1a1a] rounded-xl w-full max-w-sm border border-[#2a2a2a] overflow-hidden animate-scaleIn">
+            <div className="p-5 text-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <IoTrashOutline size={32} className="text-red-400" />
+              </div>
+              <h3 className="text-white text-lg font-semibold mb-2">
+                Delete {user?.isGroup ? "Group" : "Chat"}?
+              </h3>
+              <p className="text-[#8a8a8a] text-sm mb-4">
+                Are you sure you want to delete{" "}
+                <span className="text-white font-medium">
+                  "{getChatDisplayName()}"
+                </span>
+                ?
+              </p>
+
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-left">
+                <p className="text-red-400 text-xs">
+                  ⚠️ This action cannot be undone. All messages in this{" "}
+                  {user?.isGroup ? "group" : "chat"} will be permanently deleted.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex border-t border-[#2a2a2a]">
+              <button
+                onClick={() => setShowDeleteGroupConfirm(false)}
+                disabled={isDeletingGroup}
+                className="flex-1 py-3.5 text-white font-medium hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <div className="w-px bg-[#2a2a2a]"></div>
+              <button
+                onClick={handleDeleteGroup}
+                disabled={isDeletingGroup}
+                className="flex-1 py-3.5 text-red-400 font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isDeletingGroup ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <IoTrashOutline size={18} />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {showNotification && (
         <div
           className={`fixed bottom-24 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 z-50 animate-slideUp ${notificationType === "success"
-            ? "bg-[#1a1a1a] border border-[#2a2a2a]"
-            : "bg-red-500"
+              ? "bg-[#1a1a1a] border border-[#2a2a2a]"
+              : "bg-red-500"
             }`}
         >
           {notificationType === "success" ? (
@@ -1117,7 +1224,7 @@ const ChatWindow = ({ user, closeChat }) => {
       />
 
       {/* Group Details Modal */}
-      {showGroupDetails && user.isGroup && (
+      {showGroupDetails && user?.isGroup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-[#1a1a1a] rounded-lg w-full max-w-md border border-[#2a2a2a] overflow-hidden">
             <div className="p-4 border-b border-[#2a2a2a] bg-[#0a0a0a] flex items-center justify-between">
@@ -1150,7 +1257,7 @@ const ChatWindow = ({ user, closeChat }) => {
                     {user.groupName}
                   </h3>
                   <p className="text-[#8a8a8a] text-sm">
-                    {user.members.length} members
+                    {user.members?.length || 0} members
                   </p>
                 </div>
               </div>
@@ -1160,8 +1267,11 @@ const ChatWindow = ({ user, closeChat }) => {
                   Members
                 </h4>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {user.members.map((member) => {
+                  {user.members?.map((member) => {
                     const memberColor = getAvatarColor(member.fullname);
+                    const isAdmin =
+                      user.isAdmin === member._id ||
+                      user.isAdmin?._id === member._id;
                     return (
                       <div
                         key={member._id}
@@ -1178,14 +1288,21 @@ const ChatWindow = ({ user, closeChat }) => {
                             {getFirstLetter(member.fullname)}
                           </span>
                         </div>
-                        <span className="text-white text-sm">
-                          {member.fullname}
-                          {member._id === userdata._id && (
-                            <span className="text-[#0078D7] text-xs ml-2">
-                              (You)
+                        <div className="flex-1">
+                          <span className="text-white text-sm">
+                            {member.fullname}
+                            {member._id === userdata?._id && (
+                              <span className="text-[#0078D7] text-xs ml-2">
+                                (You)
+                              </span>
+                            )}
+                          </span>
+                          {isAdmin && (
+                            <span className="text-[#8a8a8a] text-xs block">
+                              Admin
                             </span>
                           )}
-                        </span>
+                        </div>
                       </div>
                     );
                   })}
