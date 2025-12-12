@@ -44,3 +44,19 @@ export default {
     play,
     _audio: audio
 };
+
+
+  // Close chat options when pressing Escape
+//   useEffect(() => {
+//     const handleEscape = (e) => {
+//       if (e.key === "Escape") {
+//         setChatOptionsOpen(null);
+//         if (showDeleteConfirm) {
+//           setShowDeleteConfirm(false);
+//           setGroupToDelete(null);
+//         }
+//       }
+//     };
+//     document.addEventListener("keydown", handleEscape);
+//     return () => document.removeEventListener("keydown", handleEscape);
+//   }, [showDeleteConfirm]);

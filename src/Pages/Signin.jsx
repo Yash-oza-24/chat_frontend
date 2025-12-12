@@ -25,15 +25,27 @@ const Signin = () => {
 
     setLoading(true);
     try {
-      await signin({ username, password });
+      const response = await signin({ username, password });
+
+      // Ensure token and user are saved before navigation
+      if (response.token) {
+        localStorage.setItem("Token", response.token);
+      }
+      if (response.user) {
+        localStorage.setItem("User", JSON.stringify(response.user));
+      }
+
+      // Small delay to ensure localStorage is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       navigate("/");
     } catch (error) {
-      toast.error("Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ... rest of the component remains the same
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       {/* Background Pattern */}
